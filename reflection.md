@@ -8,15 +8,23 @@
 - What classes did you include, and what responsibilities did you assign to each?
 
     My intial UML design will contain a total of 5 class, being the the Pet, Task, Owner, Scheduler, and Report classes.
-    Pet -> store atributes like name, age, weight, breed
-    Task -> description of task needed like groooming, feeding, medical checkup. 
-    Owner -> store owner attributes like name, schedule, and preferences
-    Schdeule -> creates the unique schedule with a written explanation 
+
+    Pet -> represents an animal and owns a list of Task objects. It stores profile info (species, breed, age, weight, medical history) and is responsible for managing its own task list 
+
+    Task -> represents a action like feeding, walk, medication, or appointment. Will manage marking itself complete, rescheduling, and reporting whether it's overdue
+
+    Owner -> represents a person and owns a list of Pet objects. It stores contact info and is responsible for managing their pets and surfacing a unified view of upcoming tasks across all their pets
+
+    Schdeule -> holds references to all owners and tasks system wide. It's responsible for the algorithmic work and prioritizies tasks by urgency, assembling a daily agenda for an owner, finding overdue tasks across all pets, and triggering reminders
 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+    Yes, I made some changes to the design during implementation.
+
+    A change I made was removing self.all_tasks: list as a stored list and replaced it with a property that derives the list from owners → pets → tasks. This eliminates the dual-list sync problem where Pet tasks and prevents Scheduler all_tasks from drifting out of sync. 
 
 ---
 

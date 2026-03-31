@@ -1,27 +1,42 @@
-from datetime import datetime
+from __future__ import annotations
+from datetime import datetime, date, timedelta
 
 
 class Task:
-    def __init__(self, id: int, title: str, type: str, due_datetime: datetime, priority: int, notes: str = ""):
+    PRIORITY_LABELS = {1: "Very Low", 2: "Low", 3: "Medium", 4: "High", 5: "Critical"}
+
+    def __init__(self, id: int, title: str, type: str, due_datetime: datetime,
+                 priority: int, duration_minutes: int = 0, notes: str = ""):
         self.id = id
         self.title = title
         self.type = type          # "feeding", "walk", "medication", "appointment"
         self.due_datetime = due_datetime
         self.priority = priority  # 1 (lowest) to 5 (highest)
+        self.duration_minutes = duration_minutes
         self.is_completed = False
         self.notes = notes
+        self.pet: Pet | None = None  # set by Pet.add_task()
 
     def complete(self):
-        pass
+        """Mark this task as done."""
+        self.is_completed = True
 
     def reschedule(self, new_datetime: datetime):
-        pass
+        """Move the task to a new time and reopen it if it was marked complete."""
+        self.due_datetime = new_datetime
+        self.is_completed = False
 
     def is_overdue(self) -> bool:
-        pass
+        """Return True if the task is past due and not yet completed."""
+        return not self.is_completed and datetime.now() > self.due_datetime
 
     def get_priority_label(self) -> str:
-        pass
+        """Return a human-readable priority label."""
+        return self.PRIORITY_LABELS.get(self.priority, "Unknown")
+
+    def __repr__(self):
+        status = "done" if self.is_completed else ("OVERDUE" if self.is_overdue() else "pending")
+        return f"Task({self.title!r}, {self.get_priority_label()}, {self.due_datetime:%H:%M}, {status})"
 
 
 class Pet:
@@ -33,22 +48,34 @@ class Pet:
         self.age = age
         self.weight = weight
         self.medical_history: list[str] = []
-        self.tasks: list[Task] = []
+        self.tasks: list[Task] = []  # single source of truth for this pet's tasks
 
     def add_task(self, task: Task):
-        pass
+        """Attach a task to this pet and set the back-reference."""
+        task.pet = self
+        self.tasks.append(task)
 
     def remove_task(self, task_id: int):
-        pass
+        """Remove a task by its id."""
+        self.tasks = [t for t in self.tasks if t.id != task_id]
 
     def get_tasks(self) -> list[Task]:
-        pass
+        """Return all tasks for this pet."""
+        return list(self.tasks)
 
     def get_overdue_tasks(self) -> list[Task]:
-        pass
+        """Return tasks that are past due and incomplete."""
+        return [t for t in self.tasks if t.is_overdue()]
 
     def update_info(self, field: str, value):
-        pass
+        """Update a pet attribute by name (e.g. field='weight', value=12.5)."""
+        if hasattr(self, field):
+            setattr(self, field, value)
+        else:
+            raise AttributeError(f"Pet has no attribute '{field}'")
+
+    def __repr__(self):
+        return f"Pet({self.name!r}, {self.species}, {len(self.tasks)} tasks)"
 
 
 class Owner:
@@ -60,37 +87,82 @@ class Owner:
         self.pets: list[Pet] = []
 
     def add_pet(self, pet: Pet):
-        pass
+        """Register a pet under this owner."""
+        self.pets.append(pet)
 
     def remove_pet(self, pet_id: int):
-        pass
+        """Remove a pet by its id."""
+        self.pets = [p for p in self.pets if p.id != pet_id]
 
     def get_pets(self) -> list[Pet]:
-        pass
+        """Return all pets belonging to this owner."""
+        return list(self.pets)
 
-    def get_upcoming_tasks(self) -> list[Task]:
-        pass
+    def get_upcoming_tasks(self, days: int = 1) -> list[Task]:
+        """Return all incomplete tasks due within the next `days` days, across all pets."""
+        cutoff = datetime.now() + timedelta(days=days)
+        return [
+            task
+            for pet in self.pets
+            for task in pet.tasks
+            if not task.is_completed and task.due_datetime <= cutoff
+        ]
+
+    def __repr__(self):
+        return f"Owner({self.name!r}, {len(self.pets)} pets)"
 
 
 class Scheduler:
     def __init__(self):
-        self.all_tasks: list[Task] = []
         self.owners: list[Owner] = []
 
+    @property
+    def all_tasks(self) -> list[Task]:
+        """Derive the full task list from the owner→pet→task hierarchy (single source of truth)."""
+        return [task for owner in self.owners for pet in owner.pets for task in pet.tasks]
+
     def add_owner(self, owner: Owner):
-        pass
+        """Register an owner with the scheduler."""
+        self.owners.append(owner)
 
     def schedule_task(self, pet: Pet, task: Task):
-        pass
+        """Add a task to a pet. The pet sets the back-reference via add_task()."""
+        pet.add_task(task)
 
     def prioritize_tasks(self, tasks: list[Task]) -> list[Task]:
-        pass
+        """Sort tasks by priority descending, then due_datetime ascending.
+        Overdue tasks are always surfaced first within the same priority tier."""
+        return sorted(
+            tasks,
+            key=lambda t: (-t.priority, t.is_overdue() is False, t.due_datetime)
+        )
 
-    def get_daily_agenda(self, owner: Owner) -> list[Task]:
-        pass
+    def get_daily_agenda(self, owner: Owner, agenda_date: date = None) -> list[Task]:
+        """Return prioritized tasks for a specific date (defaults to today) for all of the owner's pets."""
+        target = agenda_date or date.today()
+        day_tasks = [
+            task
+            for pet in owner.pets
+            for task in pet.tasks
+            if not task.is_completed and task.due_datetime.date() == target
+        ]
+        return self.prioritize_tasks(day_tasks)
 
     def get_overdue_tasks(self) -> list[Task]:
-        pass
+        """Return all overdue tasks across every pet, delegating to Pet.get_overdue_tasks()."""
+        return [task for owner in self.owners for pet in owner.pets for task in pet.get_overdue_tasks()]
 
-    def send_reminder(self, task: Task):
-        pass
+    def send_reminder(self, task: Task) -> str:
+        """Build a reminder message. Uses task.pet back-reference to find the owner."""
+        if task.pet is None:
+            return f"Reminder: '{task.title}' is due at {task.due_datetime:%H:%M}."
+
+        owner = next(
+            (o for o in self.owners if task.pet in o.pets),
+            None
+        )
+        owner_name = owner.name if owner else "Owner"
+        return (
+            f"Hi {owner_name}! Reminder: '{task.title}' for {task.pet.name} "
+            f"is due at {task.due_datetime:%H:%M} [{task.get_priority_label()} priority]."
+        )
