@@ -7,6 +7,12 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+    My intial UML design will contain a total of 5 class, being the the Pet, Task, Owner, Scheduler, and Report classes.
+    Pet -> store atributes like name, age, weight, breed
+    Task -> description of task needed like groooming, feeding, medical checkup. 
+    Owner -> store owner attributes like name, schedule, and preferences
+    Schdeule -> creates the unique schedule with a written explanation 
+
 **b. Design changes**
 
 - Did your design change during implementation?
