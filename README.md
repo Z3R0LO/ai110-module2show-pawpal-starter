@@ -32,6 +32,36 @@ The `Scheduler` class goes beyond a simple task list with several algorithmic fe
 - **Auto-rescheduling** — completing a recurring task (`daily` or `weekly`) automatically creates the next occurrence on the same pet.
 - **Flexible filtering** — tasks can be filtered by completion status, pet name, or both.
 
+## Testing PawPal+
+
+### Running the tests
+
+```bash
+python -m pytest tests/test_pawpal.py -v
+```
+
+### What the tests cover
+
+| Area | Tests | What is verified |
+|---|---|---|
+| Task completion | `test_task_completion` | `complete()` sets `is_completed = True` |
+| Pet task management | `test_task_addition_increases_count` | `add_task()` increments `pet.tasks` |
+| Sorting | `test_sort_by_time_returns_chronological_order` | Tasks come back earliest `due_datetime` first regardless of insertion order |
+| Sorting | `test_sort_by_time_already_ordered_unchanged` | A pre-sorted list is not disturbed |
+| Recurrence | `test_complete_daily_task_creates_next_occurrence` | Completing a `daily` task creates a new task on the same pet due exactly 1 day later, with `recurrence` preserved |
+| Recurrence | `test_complete_non_recurring_task_creates_no_next_occurrence` | A task with `recurrence=None` returns `None` and creates nothing |
+| Conflict detection | `test_detect_conflicts_overlapping_tasks` | Two tasks with overlapping time windows produce a warning naming both tasks |
+| Conflict detection | `test_detect_conflicts_non_overlapping_tasks` | Tasks sharing an exact boundary (end == start) are not flagged |
+| Conflict detection | `test_detect_conflicts_ignores_completed_tasks` | Completed tasks are excluded from conflict checks |
+
+### Confidence Level
+
+**4 / 5 stars**
+
+The core scheduling behaviors — sorting, recurrence, and conflict detection — are verified and all 9 tests pass. Confidence is not a full 5 stars because the test suite does not yet cover priority-based ordering (`prioritize_tasks`), the daily agenda, reminder formatting, or the `Owner.get_upcoming_tasks` edge cases identified during review. Those paths exist in the code but remain unverified by automated tests.
+
+---
+
 ## Getting started
 
 ### Setup
