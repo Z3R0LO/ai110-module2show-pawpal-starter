@@ -22,6 +22,16 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Smarter Scheduling
+
+The `Scheduler` class goes beyond a simple task list with several algorithmic features:
+
+- **Priority-first ordering** — tasks are ranked by priority (1–5), with overdue tasks always surfaced first within the same tier.
+- **Conflict detection** — flags any two tasks whose time windows overlap, using start/end datetime comparisons.
+- **Daily agenda** — filters tasks to a target date and returns them in priority order, ready to display.
+- **Auto-rescheduling** — completing a recurring task (`daily` or `weekly`) automatically creates the next occurrence on the same pet.
+- **Flexible filtering** — tasks can be filtered by completion status, pet name, or both.
+
 ## Getting started
 
 ### Setup

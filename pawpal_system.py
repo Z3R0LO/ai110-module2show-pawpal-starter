@@ -6,7 +6,8 @@ class Task:
     PRIORITY_LABELS = {1: "Very Low", 2: "Low", 3: "Medium", 4: "High", 5: "Critical"}
 
     def __init__(self, id: int, title: str, type: str, due_datetime: datetime,
-                 priority: int, duration_minutes: int = 0, notes: str = ""):
+                 priority: int, duration_minutes: int = 0, notes: str = "",
+                 recurrence: str = None):
         self.id = id
         self.title = title
         self.type = type          # "feeding", "walk", "medication", "appointment"
@@ -15,6 +16,7 @@ class Task:
         self.duration_minutes = duration_minutes
         self.is_completed = False
         self.notes = notes
+        self.recurrence = recurrence  # "daily", "weekly", or None
         self.pet: Pet | None = None  # set by Pet.add_task()
 
     def complete(self):
@@ -128,6 +130,80 @@ class Scheduler:
     def schedule_task(self, pet: Pet, task: Task):
         """Add a task to a pet. The pet sets the back-reference via add_task()."""
         pet.add_task(task)
+
+    def detect_conflicts(self, tasks: list[Task]) -> list[str]:
+        """Check for scheduling conflicts among a list of tasks.
+
+        Two tasks conflict when their time windows overlap:
+            task A starts before task B ends AND task B starts before task A ends.
+
+        Returns a list of warning strings (empty list = no conflicts).
+        """
+        warnings = []
+        incomplete = [t for t in tasks if not t.is_completed]
+
+        for i, a in enumerate(incomplete):
+            for b in incomplete[i + 1:]:
+                a_start = a.due_datetime
+                a_end   = a.due_datetime + timedelta(minutes=a.duration_minutes)
+                b_start = b.due_datetime
+                b_end   = b.due_datetime + timedelta(minutes=b.duration_minutes)
+
+                if a_start < b_end and b_start < a_end:
+                    a_pet = a.pet.name if a.pet else "unknown pet"
+                    b_pet = b.pet.name if b.pet else "unknown pet"
+                    warnings.append(
+                        f"WARNING: '{a.title}' ({a_pet}, {a_start:%I:%M %p}–{a_end:%I:%M %p}) "
+                        f"overlaps with '{b.title}' ({b_pet}, {b_start:%I:%M %p}–{b_end:%I:%M %p})"
+                    )
+
+        return warnings
+
+    def complete_task(self, task: Task, next_task_id: int) -> Task | None:
+        """Mark a task complete. If it recurs, schedule the next occurrence on the same pet.
+
+        Returns the newly created Task if one was scheduled, otherwise None.
+        """
+        task.complete()
+
+        if task.recurrence == "daily":
+            delta = timedelta(days=1)
+        elif task.recurrence == "weekly":
+            delta = timedelta(weeks=1)
+        else:
+            return None
+
+        next_task = Task(
+            id=next_task_id,
+            title=task.title,
+            type=task.type,
+            due_datetime=task.due_datetime + delta,
+            priority=task.priority,
+            duration_minutes=task.duration_minutes,
+            notes=task.notes,
+            recurrence=task.recurrence,
+        )
+        self.schedule_task(task.pet, next_task)
+        return next_task
+
+    def filter_tasks(self, tasks: list[Task], completed: bool = None, pet_name: str = None) -> list[Task]:
+        """Filter tasks by completion status and/or pet name.
+
+        - completed=True  → only completed tasks
+        - completed=False → only incomplete tasks
+        - completed=None  → all tasks regardless of status
+        - pet_name        → only tasks belonging to a pet with that name (case-insensitive)
+        """
+        result = tasks
+        if completed is not None:
+            result = [t for t in result if t.is_completed == completed]
+        if pet_name is not None:
+            result = [t for t in result if t.pet and t.pet.name.lower() == pet_name.lower()]
+        return result
+
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Sort tasks by due_datetime ascending."""
+        return sorted(tasks, key=lambda t: t.due_datetime)
 
     def prioritize_tasks(self, tasks: list[Task]) -> list[Task]:
         """Sort tasks by priority descending, then due_datetime ascending.

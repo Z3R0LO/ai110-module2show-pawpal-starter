@@ -35,10 +35,19 @@
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
 
+    Constraints that are considered are time, priority, and overdue status. Tasks have a due_datetime and duration_minutes. The scheduler uses both to detect overlapping windows in detect_conflicts(). Tasks have a 1–5 priority score prioritize_tasks() sorts by priority descending. Overdue tasks are always surfaced first within the same priority tier.
+
+    Time and priority are the most actionable constraints for a pet owner knowing when something is due and how urgent it is directly determines what to do next. Overdue tasks float to the top because a missed medication or feeding needs immediate attention over a future task, even one with the same priority.
+
+
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+
+    A tradeoff made is prioritize_tasks() ranks entirely by priority, then overdue status, then time. This means a lower-priority task due in 5 minutes can be ranked below a higher-priority task due in 3 hours.
+
+    This is reasonable for pet care, a critical task generally should preempt a low priority one regardless of timing. As missing a dose is worse than being slightly late for a walk. The tradeoff accepts some time urgency loss in exchange for simpler, more predictable priority first behavior that pet owners can easily reason about.
 
 ---
 
