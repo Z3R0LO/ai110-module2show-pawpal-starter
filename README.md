@@ -22,6 +22,95 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Getting started
+
+### Setup
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Suggested workflow
+
+1. Read the scenario carefully and identify requirements and edge cases.
+2. Draft a UML diagram (classes, attributes, methods, relationships).
+3. Convert UML into Python class stubs (no logic yet).
+4. Implement scheduling logic in small increments.
+5. Add tests to verify key behaviors.
+6. Connect your logic to the Streamlit UI in `app.py`.
+7. Refine UML so it matches what you actually built.
+
+---------------------------------------------------------------
+## Features
+
+### Multi-pet management
+
+The app models a full ownership hierarchy: an `Owner` holds a list of `Pet` objects, each of which owns its own list of `Task` objects. The sidebar lets you register additional pets on the fly. Every scheduling operation — agenda, conflicts, reminders — fans out across all pets automatically.
+
+### Task scheduling with rich metadata
+
+Each task stores a title, type (`walk`, `feeding`, `medication`, `appointment`, `grooming`), due date and time, priority (1–5), duration in minutes, optional recurrence, and free-text notes. Duration is critical — it is used by conflict detection to compute each task's time window.
+
+### Chronological sorting
+
+`Scheduler.sort_by_time()` sorts any list of tasks by `due_datetime` ascending. The "All Tasks" panel always displays tasks in this order regardless of insertion order, using Python's `sorted()` with a `due_datetime` key function.
+
+### Priority-first daily agenda
+
+`Scheduler.prioritize_tasks()` applies a three-level sort:
+
+1. **Priority descending** — `Critical` (5) before `High` (4), and so on down to `Very Low` (1).
+2. **Overdue first within a tier** — among tasks of equal priority, those already past due surface above future tasks.
+3. **Time ascending as a tiebreaker** — tasks with the same priority and overdue status are ordered by `due_datetime`.
+
+`Scheduler.get_daily_agenda()` filters to today's incomplete tasks and then applies this sort, producing the ranked schedule shown in the "Today's Prioritized Agenda" panel.
+
+### Conflict detection
+
+`Scheduler.detect_conflicts()` checks every pair of incomplete tasks for time-window overlap using the standard interval-intersection condition:
+
+```
+task A starts before task B ends  AND  task B starts before task A ends
+```
+
+Each window is `due_datetime` to `due_datetime + duration_minutes`. Completed tasks are excluded. Each detected overlap produces a warning string naming both tasks, their pets, and the exact time windows. The UI renders these as `st.warning` banners, or a `st.success` confirmation when the schedule is clean.
+
+### Overdue detection
+
+`Task.is_overdue()` returns `True` when `datetime.now() > due_datetime` and the task is not yet complete. Overdue tasks appear at the top of the daily agenda under a red `st.error` banner, separate from the prioritized table below.
+
+### Recurring task auto-scheduling
+
+`Scheduler.complete_task()` marks a task done and, if `recurrence` is set, automatically creates the next occurrence on the same pet:
+
+- `"daily"` → next task due `due_datetime + 1 day`
+- `"weekly"` → next task due `due_datetime + 7 days`
+
+The new task inherits all metadata — title, type, priority, duration, notes, and recurrence — so the chain continues indefinitely. The UI reports the next scheduled date in a `st.success` message.
+
+### Flexible filtering
+
+`Scheduler.filter_tasks()` accepts two independent, combinable filters:
+
+- `completed=True / False / None` — restrict to done, incomplete, or all tasks
+- `pet_name` — case-insensitive match against `task.pet.name`
+
+The "Filter Tasks" panel exposes both as dropdowns. Results are passed through `sort_by_time()` before display.
+
+### Reminder generation
+
+`Scheduler.send_reminder()` walks the `owner → pets` hierarchy to resolve the owner for a given task and returns a personalized message:
+
+```
+Hi Jordan! Reminder: 'Morning walk' for Mochi is due at 08:00 [High priority].
+```
+
+If the task has no pet attached, a generic fallback message is returned instead.
+
+------------------------------------------------------------------
+
 ## Smarter Scheduling
 
 The `Scheduler` class goes beyond a simple task list with several algorithmic features:
@@ -31,6 +120,8 @@ The `Scheduler` class goes beyond a simple task list with several algorithmic fe
 - **Daily agenda** — filters tasks to a target date and returns them in priority order, ready to display.
 - **Auto-rescheduling** — completing a recurring task (`daily` or `weekly`) automatically creates the next occurrence on the same pet.
 - **Flexible filtering** — tasks can be filtered by completion status, pet name, or both.
+
+---------------------------------------------------------------
 
 ## Testing PawPal+
 
@@ -60,24 +151,11 @@ python -m pytest tests/test_pawpal.py -v
 
 The core scheduling behaviors — sorting, recurrence, and conflict detection — are verified and all 9 tests pass. Confidence is not a full 5 stars because the test suite does not yet cover priority-based ordering (`prioritize_tasks`), the daily agenda, reminder formatting, or the `Owner.get_upcoming_tasks` edge cases identified during review. Those paths exist in the code but remain unverified by automated tests.
 
----
+------------------------------------------------------------------
 
-## Getting started
+### Demo 
 
-### Setup
+<a href="/ai110-module2show-pawpal-starter/final_app.png" target="_blank"><img src='/ai110-module2show-pawpal-starter
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
+### check "final_app.png" under ai110-module2show-pawpal-starter
 
-### Suggested workflow
-
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
